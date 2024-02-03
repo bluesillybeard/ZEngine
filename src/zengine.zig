@@ -13,9 +13,13 @@ pub const ZEngineComptimeOptions = struct {
 pub const RegistrySet = struct {
     globalRegistry: registry.SystemRegistry,
     globalEcsRegistry: ecs.Registry,
-    localRegistries: std.ArrayList(registry.SystemRegistry),
-    localEcsRegistry: std.ArrayList(ecs.Registry),
+    /// Sparse list
+    localRegistries: std.ArrayList(?registry.SystemRegistry),
+    /// Sparse list
+    localEcsRegistry: std.ArrayList(?ecs.Registry),
 };
+
+pub const LocalHandle = usize;
 
 /// ZEngine requires a bunch of compile-time information from the user. This function should only be called once for each application.
 pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
@@ -38,9 +42,9 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             var this = @This(){
                 .registries = .{
                     .globalRegistry = SystemRegistry.init(allocator),
-                    .globalEcs = ecs.Registry.init(allocator),
-                    .localRegistries = std.ArrayList(SystemRegistry).init(allocator),
-                    .localEcs = std.ArrayList(ecs.Registry).init(allocator),
+                    .globalEcsRegistry = ecs.Registry.init(allocator),
+                    .localRegistries = std.ArrayList(?SystemRegistry).init(allocator),
+                    .localEcsRegistry = std.ArrayList(?ecs.Registry).init(allocator),
                 }
                 
             };
@@ -54,21 +58,73 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // Properly initialize all of the systems
             inline for(options.globalSystems) |System| {
                 const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
-                try system.systemInit(this.registries.globalRegistry, this.registrySet.globalEcs);
+                try system.systemInit(&this.registries);
             }
             return this;
         }
 
+        pub fn initLocal(this: *@This(), allocator: std.mem.Allocator) !LocalHandle {
+            const handle = try this.reserveLocal();
+            var localRegistry = SystemRegistry.init(allocator);
+            this.registries.localRegistries.items[handle] = localRegistry;
+            // allocate the systems
+            inline for(options.localSystems) |System| {
+                const system = try localRegistry.staticAllocator.create(System);
+                system.* = System.init(localRegistry.staticAllocator, allocator);
+                try localRegistry.addRegister(System, system);
+            }
+            const localEcs = ecs.Registry.init(allocator);
+            this.registries.localEcsRegistry.items[handle] = localEcs;
+            // initialize the systems
+            inline for(options.localSystems) |System| {
+                const system = localRegistry.getRegister(System) orelse unreachable;
+                try system.systemInit(this.registries);
+            }
+        }
+
         /// Deinit ZEngine, along with all of its associated resources.
         pub fn deinit(this: *@This()) void {
-            _ = this; // autofix
-            // destroy local registries first, in case they depend on the global registries
-            for(this.registries.localRegistries.items) |registry| {
+            // deinit local systems
+            for(this.registries.localRegistries.items) |*localRegistryOrNone| {
+                if(localRegistryOrNone.* == null) continue;
+                const localRegistry = &localRegistryOrNone.*.?;
                 inline for(options.localSystems) |System| {
-                    const system = registry.getRegister(System);
-                    
+                    const system = localRegistry.getRegister(System);
+                    system.systemDeinit(this.registries);
                 }
             }
+            // destroy local systems
+            for(this.registries.localRegistries.items) |*localRegistryOrNone| {
+                if(localRegistryOrNone.* == null) continue;
+                const localRegistry = &localRegistryOrNone.*.?;
+                inline for(options.localSystems) |System| {
+                    const system = localRegistry.getRegister(System);
+                    system.deinit();
+                }
+                localRegistry.deinit();
+            }
+            // deinit global systems
+            inline for(options.globalSystems) |System| {
+                const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
+                try system.systemDeinit(&this.registries);
+            }
+            // destroy global systems
+            inline for(options.globalSystems) |System| {
+                const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
+                system.deinit();
+            }
+            this.registries.globalEcsRegistry.deinit();
+            this.registries.globalRegistry.deinit();
+            this.registries.localEcsRegistry.deinit();
+            this.registries.localRegistries.deinit();
+        }
+
+        fn reserveLocal(this: *@This()) !LocalHandle {
+            // TODO: find an empty spot if there is one
+            const index = this.registries.localRegistries.items.len;
+            _ = try this.registries.localRegistries.addOne();
+            _ = try this.registries.localEcsRegistry.addOne();
+            return index;
         }
         registries: RegistrySet,
     };

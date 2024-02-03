@@ -44,8 +44,9 @@ pub const SystemRegistry = struct {
         };
     }
 
-    pub fn deinit(this: This) void {
+    pub fn deinit(this: *This) void {
         this.storage.deinit();
+        this.staticAllocator.deinit();
     }
 
     pub fn addRegister(this: *This, comptime T: type, register: *T) SystemRegistryError!void {
