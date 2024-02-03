@@ -21,8 +21,6 @@ A basic game engine written in Zig.
 
 ## Development steps
 - create the framework of ZEngine
-    - system registry
-    - component registry
     - ECS
     - Make sure that entity registries can be instantiated in a non-static manner
         - Systems can either have a separate state for each registry, or a single state for all registries.
