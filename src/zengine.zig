@@ -82,26 +82,32 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             }
         }
 
+        pub fn deinitLocal(this: *@This(), local: LocalHandle) void {
+            // deinit the local registry
+            // TODO: deinit systems in backwards order
+            const localRegistry = &this.registries.localRegistries.items[local].?;
+            inline for(options.localSystems) |System| {
+                const system = localRegistry.getRegister(System);
+                system.systemDeinit(this.registries);
+            }
+            inline for(options.localSystems) |System| {
+                const system = localRegistry.getRegister(System);
+                system.deinit();
+            }
+            localRegistry.deinit();
+            // Don't forget the entities too
+            const localEcs = &this.registries.localEcsRegistry.items[local].?;
+            localEcs.deinit();
+        }
+
         /// Deinit ZEngine, along with all of its associated resources.
         pub fn deinit(this: *@This()) void {
+            // TODO: deinit systems in backwards order
+            
             // deinit local systems
-            for(this.registries.localRegistries.items) |*localRegistryOrNone| {
+            for(this.registries.localRegistries.items, 0..) |localRegistryOrNone, index| {
                 if(localRegistryOrNone.* == null) continue;
-                const localRegistry = &localRegistryOrNone.*.?;
-                inline for(options.localSystems) |System| {
-                    const system = localRegistry.getRegister(System);
-                    system.systemDeinit(this.registries);
-                }
-            }
-            // destroy local systems
-            for(this.registries.localRegistries.items) |*localRegistryOrNone| {
-                if(localRegistryOrNone.* == null) continue;
-                const localRegistry = &localRegistryOrNone.*.?;
-                inline for(options.localSystems) |System| {
-                    const system = localRegistry.getRegister(System);
-                    system.deinit();
-                }
-                localRegistry.deinit();
+                this.deinitLocal(index);
             }
             // deinit global systems
             inline for(options.globalSystems) |System| {
