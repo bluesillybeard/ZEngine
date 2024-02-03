@@ -18,15 +18,19 @@ pub const SystemTemplate = extern struct {
     // This is for verifying the system is in the right registry (global v.s local), and making sure all of the systems this one depends on is present before it.
     pub fn comptimeVerification(comptime options: zengine.ZEngineComptimeOptions) bool {
         _ = options;
+        return true;
     }
 
-    // This is just for initializing the object at a basic level.
+    // This is just for initializing the object at a basic level. Allocate memory that lasts for the lifetime of this system with the static allocator,
+    // and other things that may be freed or incur more allocations before deinit should use the heap allocator.
     pub fn init(staticAllocator: std.mem.Allocator, heapAllocator: std.mem.Allocator) @This() {
         _ = heapAllocator;
         _ = staticAllocator;
+        return .{};
     }
     // The system init method is much more capible, as it is run after all of the systems have been created in memory.
     // It can get a reference to another system - this is how systems can act like libraries.
+    // Global systems are initialized first.
     pub fn systemInit(this: *@This(), registries: zengine.RegistrySet) !void {
         _ = registries;
         _ = this;
@@ -34,12 +38,14 @@ pub const SystemTemplate = extern struct {
 
     // This method probably won't have a lot for most systems, however it is present for doing things like serializing save data or disconnecting from servers.
     // Put simply, it is a deinit method that still has access to all of the systems.
+    // Local systems are deinited first.
     pub fn systemDeinit(this: *@This(), registries: zengine.RegistrySet) !void {
         _ = registries;
         _ = this;
     }
 
     // At a minimum, this method should clear out any memory that was allocated using the heap allocator given at init.
+    // don't want to free any memory in the systemDeinit method, as other systems could reference it and freeing memory too early could cause access violations.
     pub fn deinit(this: *@This()) void {
         _ = this;
 
