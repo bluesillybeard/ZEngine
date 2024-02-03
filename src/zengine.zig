@@ -106,7 +106,7 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             
             // deinit local systems
             for(this.registries.localRegistries.items, 0..) |localRegistryOrNone, index| {
-                if(localRegistryOrNone.* == null) continue;
+                if(localRegistryOrNone == null) continue;
                 this.deinitLocal(index);
             }
             // deinit global systems
