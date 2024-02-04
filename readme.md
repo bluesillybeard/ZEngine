@@ -27,5 +27,4 @@ A basic game engine written in Zig.
 - built-in serialization
     - automatic and explicit version forwarding
     - components can be excluded from serialization
-- Fully encompassing test suite.
-    - Right now, only the global system framework is tested
+- increase test coverage

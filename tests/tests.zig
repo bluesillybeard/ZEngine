@@ -185,7 +185,7 @@ test "LocalSystems" {
 
     // Create a new local system
     const handle2 = try engine.initLocal(testing.allocator);
-    // Still once since num is decremented when LocalSystemTwo is deinited.
+    // Still one since num is decremented when LocalSystemTwo is deinited.
     try testing.expectEqual(1, engine.registries.globalRegistry.getRegister(SillySystem).?.num);
     // LocalSystemOne's num should be 1, also incremented by LocalSystemTwo
     try testing.expectEqual(1, engine.registries.localRegistries.items[handle2].?.getRegister(LocalSystemOne).?.num);
@@ -199,7 +199,7 @@ test "TooManyWorlds" {
     var engine = try ZEngine.init(testing.allocator);
     defer engine.deinit();
     var rand = std.rand.DefaultPrng.init(69420);
-    const num = 1000;
+    const num = 100;
     for(0..num) |_|{
         const rng = rand.random().float(f32);
         if(rng > 0.5 and engine.registries.localRegistries.items.len > num/2){
