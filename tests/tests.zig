@@ -179,4 +179,14 @@ test "LocalSystems" {
     try testing.expectEqual(1, engine.registries.globalRegistry.getRegister(SillySystem).?.num);
     // LocalSystemOne's num should be 1, also incremented by LocalSystemTwo
     try testing.expectEqual(1, engine.registries.localRegistries.items[handle].?.getRegister(LocalSystemOne).?.num);
+
+    // Destroy the local system
+    engine.deinitLocal(handle);
+
+    // Create a new local system
+    const handle2 = try engine.initLocal(testing.allocator);
+    // Still once since num is decremented when LocalSystemTwo is deinited.
+    try testing.expectEqual(1, engine.registries.globalRegistry.getRegister(SillySystem).?.num);
+    // LocalSystemOne's num should be 1, also incremented by LocalSystemTwo
+    try testing.expectEqual(1, engine.registries.localRegistries.items[handle2].?.getRegister(LocalSystemOne).?.num);
 }

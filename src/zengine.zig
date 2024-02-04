@@ -100,6 +100,9 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // Don't forget the entities too
             const localEcs = &this.registries.localEcsRegistry.items[local].?;
             localEcs.deinit();
+            // dereference
+            this.registries.localRegistries.items[local] = null;
+            this.registries.localEcsRegistry.items[local] = null;
         }
 
         /// Deinit ZEngine, along with all of its associated resources.
