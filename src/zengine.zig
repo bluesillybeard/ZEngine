@@ -131,7 +131,9 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
         }
 
         fn reserveLocal(this: *@This()) !LocalHandle {
-            // TODO: find an empty spot if there is one
+            for(this.registries.localRegistries.items, 0..) |item, index| {
+                if(item == null) return index;
+            }
             const index = this.registries.localRegistries.items.len;
             _ = try this.registries.localRegistries.addOne();
             _ = try this.registries.localEcsRegistry.addOne();

@@ -190,3 +190,27 @@ test "LocalSystems" {
     // LocalSystemOne's num should be 1, also incremented by LocalSystemTwo
     try testing.expectEqual(1, engine.registries.localRegistries.items[handle2].?.getRegister(LocalSystemOne).?.num);
 }
+
+test "TooManyWorlds" {
+    const ZEngine = zengine.ZEngine(.{
+        .globalSystems = &[_]type{SillySystem},
+        .localSystems = &[_]type{LocalSystemOne, LocalSystemTwo},
+    });
+    var engine = try ZEngine.init(testing.allocator);
+    defer engine.deinit();
+    var rand = std.rand.DefaultPrng.init(69420);
+    const num = 1000;
+    for(0..num) |_|{
+        const rng = rand.random().float(f32);
+        if(rng > 0.5 and engine.registries.localRegistries.items.len > num/2){
+            // Find a world to remove
+            for(engine.registries.localRegistries.items, 0..) |registryOrNone, handle| {
+                if(registryOrNone == null) continue;
+                engine.deinitLocal(handle);
+                break;
+            }
+        } else {
+            _ = try engine.initLocal(testing.allocator);
+        }
+    }
+}
