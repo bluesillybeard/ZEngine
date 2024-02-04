@@ -58,19 +58,20 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // Properly initialize all of the systems
             inline for(options.globalSystems) |System| {
                 const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
-                try system.systemInit(&this.registries);
+                try system.systemInitGlobal(&this.registries);
             }
             return this;
         }
 
         pub fn initLocal(this: *@This(), allocator: std.mem.Allocator) !LocalHandle {
             const handle = try this.reserveLocal();
-            var localRegistry = SystemRegistry.init(allocator);
-            this.registries.localRegistries.items[handle] = localRegistry;
+            this.registries.localRegistries.items[handle] = SystemRegistry.init(allocator);
+            var localRegistry = &this.registries.localRegistries.items[handle].?;
+            var staticAllocator = localRegistry.staticAllocator.allocator();
             // allocate the systems
             inline for(options.localSystems) |System| {
-                const system = try localRegistry.staticAllocator.create(System);
-                system.* = System.init(localRegistry.staticAllocator, allocator);
+                const system = try staticAllocator.create(System);
+                system.* = System.init(staticAllocator, allocator);
                 try localRegistry.addRegister(System, system);
             }
             const localEcs = ecs.Registry.init(allocator);
@@ -78,8 +79,9 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // initialize the systems
             inline for(options.localSystems) |System| {
                 const system = localRegistry.getRegister(System) orelse unreachable;
-                try system.systemInit(this.registries);
+                try system.systemInitLocal(this.registries, handle);
             }
+            return handle;
         }
 
         pub fn deinitLocal(this: *@This(), local: LocalHandle) void {
@@ -87,11 +89,11 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // TODO: deinit systems in backwards order
             const localRegistry = &this.registries.localRegistries.items[local].?;
             inline for(options.localSystems) |System| {
-                const system = localRegistry.getRegister(System);
-                system.systemDeinit(this.registries);
+                const system = localRegistry.getRegister(System).?;
+                system.systemDeinitLocal(this.registries, local);
             }
             inline for(options.localSystems) |System| {
-                const system = localRegistry.getRegister(System);
+                const system = localRegistry.getRegister(System).?;
                 system.deinit();
             }
             localRegistry.deinit();
@@ -112,7 +114,7 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // deinit global systems
             inline for(options.globalSystems) |System| {
                 const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
-                try system.systemDeinit(&this.registries);
+                system.systemDeinitGlobal(&this.registries);
             }
             // destroy global systems
             inline for(options.globalSystems) |System| {

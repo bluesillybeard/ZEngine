@@ -59,7 +59,7 @@ pub const SystemRegistry = struct {
         res.value_ptr.* = ptr;
     }
 
-    pub fn getRegister(this: *This, comptime T: type) ?*T {
+    pub fn getRegister(this: This, comptime T: type) ?*T {
         const hash = hashType(T);
         // assume the value is of the correct type.
         // We can assume this because if two different types have the same hash,

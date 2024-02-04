@@ -31,7 +31,15 @@ pub const SystemTemplate = extern struct {
     // The system init method is much more capible, as it is run after all of the systems have been created in memory.
     // It can get a reference to another system - this is how systems can act like libraries.
     // Global systems are initialized first.
-    pub fn systemInit(this: *@This(), registries: zengine.RegistrySet) !void {
+    pub fn systemInitGlobal(this: *@This(), registries: zengine.RegistrySet) !void {
+        _ = registries;
+        _ = this;
+    }
+
+    // The system init method is much more capible, as it is run after all of the systems have been created in memory.
+    // It can get a reference to another system - this is how systems can act like libraries.
+    pub fn systemInitLocal(this: *@This(), registries: zengine.RegistrySet, handle: zengine.LocalHandle) !void {
+        _ = handle; // autofix
         _ = registries;
         _ = this;
     }
@@ -39,7 +47,15 @@ pub const SystemTemplate = extern struct {
     // This method probably won't have a lot for most systems, however it is present for doing things like serializing save data or disconnecting from servers.
     // Put simply, it is a deinit method that still has access to all of the systems.
     // Local systems are deinited first.
-    pub fn systemDeinit(this: *@This(), registries: zengine.RegistrySet) !void {
+    pub fn systemDeinitGlobal(this: *@This(), registries: zengine.RegistrySet) void {
+        _ = registries;
+        _ = this;
+    }
+
+    // This method probably won't have a lot for most systems, however it is present for doing things like serializing save data or disconnecting from servers.
+    // Put simply, it is a deinit method that still has access to all of the systems.
+    // Local systems are deinited first.
+    pub fn systemDeinitLocal(this: *@This(), registries: zengine.RegistrySet) !void {
         _ = registries;
         _ = this;
     }
