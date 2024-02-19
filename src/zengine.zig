@@ -86,12 +86,12 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             const localRegistry = &this.registries.localRegistries.items[local].?;
             // deinit systems in reverse order
             inline for (0..options.localSystems.len) |index| {
-                const System = options.localSystems[options.localSystems.len - index];
+                const System = options.localSystems[options.localSystems.len - index - 1];
                 const system = localRegistry.getRegister(System).?;
                 system.systemDeinitLocal(this.registries, local);
             }
             inline for (0..options.localSystems.len) |index| {
-                const System = options.localSystems[options.localSystems.len - index];
+                const System = options.localSystems[options.localSystems.len - index - 1];
                 const system = localRegistry.getRegister(System).?;
                 system.deinit();
             }
@@ -113,13 +113,13 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             }
             // deinit global systems in reverse order
             inline for (0..options.globalSystems.len) |index| {
-                const System = options.globalSystems[options.globalSystems.len - index];
+                const System = options.globalSystems[options.globalSystems.len - index - 1];
                 const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
                 system.systemDeinitGlobal(&this.registries);
             }
             // destroy global systems in reverse order
             inline for (0..options.globalSystems.len) |index| {
-                const System = options.globalSystems[options.globalSystems.len - index];
+                const System = options.globalSystems[options.globalSystems.len - index - 1];
                 const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
                 system.deinit();
             }
