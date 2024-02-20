@@ -24,13 +24,13 @@ pub const LocalHandle = usize;
 /// ZEngine requires a bunch of compile-time information from the user. This function should only be called once for each application.
 pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
     inline for (options.globalSystems) |System| {
-        if (!System.comptimeVerification(options)) @compileError(@typeName(System) ++ " Did not pass compile-time verification");
+        if (!System.comptimeVerification(options)) @compileError(@typeName(System) ++ " did not pass compile-time verification");
         // TODO: Make sure it has all of the required functions.
         // TODO: make sure the signature matches too
 
     }
     inline for (options.localSystems) |System| {
-        if (!System.comptimeVerification(options)) @compileError(@typeName(System) ++ " Did not pass compile-time verification");
+        if (!System.comptimeVerification(options)) @compileError(@typeName(System) ++ " did not pass compile-time verification");
         // TODO: Make sure it has all of the required functions.
         // TODO: make sure the signature matches too
     }
