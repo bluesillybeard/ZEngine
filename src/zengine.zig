@@ -38,13 +38,17 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
         pub const Options = options;
         pub const SystemRegistry = registry.SystemRegistry;
         /// Creates an instance of ZEngine. Multiple instances are allowed but not recomended, instead use multiple local System/Ecs registres.
-        pub fn init(allocator: std.mem.Allocator) !@This() {
-            var this = @This(){ .registries = .{
+        pub fn init(allocator: std.mem.Allocator) !*@This() {
+            // You wouldn't believe how long it took me to find a bug relating to accidentally keeping the address of this stack variable.
+            // What's funny is I didn't notice until weeks after I created the bug, which makes me wonder how nothing bad happened before then.
+            const thisIsOnTheStackDontKeepAPointerRelatingToThis = @This(){ .registries = .{
                 .globalRegistry = SystemRegistry.init(allocator),
                 .globalEcsRegistry = ecs.Registry.init(allocator),
                 .localRegistries = std.ArrayList(?SystemRegistry).init(allocator),
                 .localEcsRegistry = std.ArrayList(?ecs.Registry).init(allocator),
-            } };
+            }, .allocator = allocator };
+            const this = try allocator.create(@This());
+            this.* = thisIsOnTheStackDontKeepAPointerRelatingToThis;
             const staticAllocator = this.registries.globalRegistry.staticAllocator.allocator();
             // Allocate all of the systems
             inline for (options.globalSystems) |System| {
@@ -127,6 +131,7 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             this.registries.globalRegistry.deinit();
             this.registries.localEcsRegistry.deinit();
             this.registries.localRegistries.deinit();
+            this.allocator.destroy(this);
         }
 
         fn reserveLocal(this: *@This()) !LocalHandle {
@@ -139,5 +144,6 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             return index;
         }
         registries: RegistrySet,
+        allocator: std.mem.Allocator,
     };
 }
