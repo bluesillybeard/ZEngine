@@ -11,7 +11,7 @@ test "BasicTest" {
         .globalSystems = &[_]type{ SillySystem, WonkySystem },
         .localSystems = &[_]type{},
     });
-    var engine = try ZEngine.init(testing.allocator);
+    var engine = try ZEngine.init(testing.allocator, .{});
     defer engine.deinit();
     // Make sure SillySystem's num variable was incremented by WonkySystem
     try testing.expectEqual(1, engine.registries.globalRegistry.getRegister(SillySystem).?.num);
@@ -23,14 +23,14 @@ test "LocalSystems" {
         .localSystems = &[_]type{ LocalSystemOne, LocalSystemTwo },
     });
 
-    var engine = try ZEngine.init(testing.allocator);
+    var engine = try ZEngine.init(testing.allocator, .{});
     defer engine.deinit();
 
     // Make sure SillySystem's num value is zero
     try testing.expectEqual(0, engine.registries.globalRegistry.getRegister(SillySystem).?.num);
 
     // Init a local system
-    const handle = try engine.initLocal(testing.allocator);
+    const handle = try engine.initLocal(testing.allocator, .{});
     // SillySystem's num should have been incremented by LocalSystemtwo
     try testing.expectEqual(1, engine.registries.globalRegistry.getRegister(SillySystem).?.num);
     // LocalSystemOne's num should be 1, also incremented by LocalSystemTwo
@@ -40,7 +40,7 @@ test "LocalSystems" {
     engine.deinitLocal(handle);
 
     // Create a new local system
-    const handle2 = try engine.initLocal(testing.allocator);
+    const handle2 = try engine.initLocal(testing.allocator, .{});
     // Still one since num is decremented when LocalSystemTwo is deinited.
     try testing.expectEqual(1, engine.registries.globalRegistry.getRegister(SillySystem).?.num);
     // LocalSystemOne's num should be 1, also incremented by LocalSystemTwo
@@ -52,7 +52,7 @@ test "TooManyWorlds" {
         .globalSystems = &[_]type{SillySystem},
         .localSystems = &[_]type{ LocalSystemOne, LocalSystemTwo },
     });
-    var engine = try ZEngine.init(testing.allocator);
+    var engine = try ZEngine.init(testing.allocator, .{});
     defer engine.deinit();
     var rand = std.rand.DefaultPrng.init(69420);
     const num = 100;
@@ -66,7 +66,7 @@ test "TooManyWorlds" {
                 break;
             }
         } else {
-            _ = try engine.initLocal(testing.allocator);
+            _ = try engine.initLocal(testing.allocator, .{});
         }
     }
 }
@@ -98,7 +98,8 @@ const SillySystem = struct {
         return .{ .num = 0 };
     }
 
-    pub fn systemInitGlobal(this: *@This(), registries: *zengine.RegistrySet) !void {
+    pub fn systemInitGlobal(this: *@This(), registries: *zengine.RegistrySet, settings: anytype) !void {
+        _ = settings;
         _ = registries;
         _ = this;
     }
@@ -152,7 +153,8 @@ pub const WonkySystem = struct {
         // Returning undefined is safe here, since all of the fields are initialized on systemInit.
         return undefined;
     }
-    pub fn systemInitGlobal(this: *@This(), registries: *zengine.RegistrySet) !void {
+    pub fn systemInitGlobal(this: *@This(), registries: *zengine.RegistrySet, settings: anytype) !void {
+        _ = settings;
         this.sillySystem = registries.globalRegistry.getRegister(SillySystem) orelse @panic("Could not find silly system");
         this.sillySystem.sayHi();
     }
@@ -186,7 +188,8 @@ const LocalSystemOne = struct {
         return .{ .num = 0 };
     }
 
-    pub fn systemInitLocal(this: *@This(), registries: zengine.RegistrySet, handle: zengine.LocalHandle) !void {
+    pub fn systemInitLocal(this: *@This(), registries: zengine.RegistrySet, handle: zengine.LocalHandle, settings: anytype) !void {
+        _ = settings;
         _ = handle;
         _ = registries;
         _ = this;
@@ -225,7 +228,8 @@ const LocalSystemTwo = struct {
         return .{};
     }
 
-    pub fn systemInitLocal(this: *@This(), registries: zengine.RegistrySet, handle: zengine.LocalHandle) !void {
+    pub fn systemInitLocal(this: *@This(), registries: zengine.RegistrySet, handle: zengine.LocalHandle, settings: anytype) !void {
+        _ = settings;
         _ = this;
         const registry = &registries.localRegistries.items[handle].?;
         const system1 = registry.getRegister(LocalSystemOne).?;

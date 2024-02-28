@@ -29,18 +29,22 @@ pub const SystemTemplate = extern struct {
     }
     // The system init method is much more capible, as it is run after all of the systems have been created in memory.
     // It can get a reference to another system - this is how systems can act like libraries.
+    // There is also a settings input for user-defined settings. It is anytype since the same settings object is given to all systems,
+    // so its type cannot be pre-determined by ZEngine.
     // Global systems are initialized first.
-    pub fn systemInitGlobal(this: *@This(), registries: *zengine.RegistrySet) !void {
+    pub fn systemInitGlobal(this: *@This(), registries: *zengine.RegistrySet, settings: anytype) !void {
         _ = registries;
         _ = this;
+        _ = settings;
     }
 
     // The system init method is much more capible, as it is run after all of the systems have been created in memory.
     // It can get a reference to another system - this is how systems can act like libraries.
-    pub fn systemInitLocal(this: *@This(), registries: *zengine.RegistrySet, handle: zengine.LocalHandle) !void {
-        _ = handle; // autofix
+    pub fn systemInitLocal(this: *@This(), registries: *zengine.RegistrySet, handle: zengine.LocalHandle, settings: anytype) !void {
+        _ = handle;
         _ = registries;
         _ = this;
+        _ = settings;
     }
 
     // This method probably won't have a lot for most systems, however it is present for doing things like serializing save data or disconnecting from servers.
@@ -63,7 +67,5 @@ pub const SystemTemplate = extern struct {
     // don't want to free any memory in the systemDeinit method, as other systems could reference it and freeing memory too early could cause access violations.
     pub fn deinit(this: *@This()) void {
         _ = this;
-
     }
 };
-

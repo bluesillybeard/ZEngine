@@ -38,7 +38,7 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
         pub const Options = options;
         pub const SystemRegistry = registry.SystemRegistry;
         /// Creates an instance of ZEngine. Multiple instances are allowed but not recomended, instead use multiple local System/Ecs registres.
-        pub fn init(allocator: std.mem.Allocator) !*@This() {
+        pub fn init(allocator: std.mem.Allocator, settings: anytype) !*@This() {
             // You wouldn't believe how long it took me to find a bug relating to accidentally keeping the address of this stack variable.
             // What's funny is I didn't notice until weeks after I created the bug, which makes me wonder how nothing bad happened before then.
             const thisIsOnTheStackDontKeepAPointerRelatingToThis = @This(){ .registries = .{
@@ -59,12 +59,12 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // Properly initialize all of the systems
             inline for (options.globalSystems) |System| {
                 const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
-                try system.systemInitGlobal(&this.registries);
+                try system.systemInitGlobal(&this.registries, settings);
             }
             return this;
         }
 
-        pub fn initLocal(this: *@This(), allocator: std.mem.Allocator) !LocalHandle {
+        pub fn initLocal(this: *@This(), allocator: std.mem.Allocator, settings: anytype) !LocalHandle {
             const handle = try this.reserveLocal();
             this.registries.localRegistries.items[handle] = SystemRegistry.init(allocator);
             var localRegistry = &this.registries.localRegistries.items[handle].?;
@@ -80,7 +80,7 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // initialize the systems
             inline for (options.localSystems) |System| {
                 const system = localRegistry.getRegister(System) orelse unreachable;
-                try system.systemInitLocal(this.registries, handle);
+                try system.systemInitLocal(this.registries, handle, settings);
             }
             return handle;
         }
