@@ -3,13 +3,13 @@ const zengine = @import("zengine.zig");
 const ecs = @import("ecs");
 // This is a template to be used for creating systems and components
 
-// Components are just normal types. They must have a defined memory layout
-pub const ComponentTemplate = extern struct {
+// Components are just normal types.
+pub const ComponentTemplate = struct {
     // Put data here
 };
 
-// Systems are also just like normal types, and they also must have a defined memory layout
-pub const SystemTemplate = extern struct {
+// Systems are also just like normal types
+pub const SystemTemplate = struct {
     /// A name for the system. Should only contain letters, numbers, and underscores. no spaces or other characters.
     pub const name: []const u8 = "system_template";
     /// The list of components added by this system.
