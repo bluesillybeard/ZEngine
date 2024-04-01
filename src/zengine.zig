@@ -80,7 +80,7 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             // initialize the systems
             inline for (options.localSystems) |System| {
                 const system = localRegistry.getRegister(System) orelse unreachable;
-                try system.systemInitLocal(this.registries, handle, settings);
+                try system.systemInitLocal(&this.registries, handle, settings);
             }
             return handle;
         }
@@ -92,7 +92,7 @@ pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
             inline for (0..options.localSystems.len) |index| {
                 const System = options.localSystems[options.localSystems.len - index - 1];
                 const system = localRegistry.getRegister(System).?;
-                system.systemDeinitLocal(this.registries, local);
+                system.systemDeinitLocal(&this.registries, local);
             }
             inline for (0..options.localSystems.len) |index| {
                 const System = options.localSystems[options.localSystems.len - index - 1];
