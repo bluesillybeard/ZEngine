@@ -3,11 +3,11 @@ const ecs = @import("ecs");
 // registries for storing systems and components.
 
 const RegistryMapContext = struct {
-    pub inline fn hash(this: @This(), key: usize) u32 {
+    pub inline fn hash(this: @This(), key: u64) u32 {
         _ = this;
         return @intCast(key & std.math.maxInt(u32));
     }
-    pub inline fn eql(this: @This(), keyA: usize, keyB: usize, idx: usize) bool {
+    pub inline fn eql(this: @This(), keyA: u64, keyB: u64, idx: usize) bool {
         _ = idx;
         _ = this;
         return keyA == keyB;
@@ -16,7 +16,7 @@ const RegistryMapContext = struct {
 // input -> type id
 // output -> pointer to the object
 // Don't store the hash since hashing is insanely fast - it's literally just a single bitwise and.
-const RegistryMap = std.ArrayHashMap(usize, usize, RegistryMapContext, false);
+const RegistryMap = std.ArrayHashMap(u64, usize, RegistryMapContext, false);
 
 fn hashType(comptime T: type) u64 {
     return std.hash.Fnv1a_64.hash(@typeName(T));
