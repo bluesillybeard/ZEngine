@@ -2,6 +2,9 @@
 
 A basic game engine written in Zig.
 
+## Important notice
+ZEngine is early in development. It may *seem* like an insanely tiny library, therefore it's impossible to get wrong. However, since this is an isanely critical part of a game, despite its simplicity there still so much it can improve. As such, expect breaking changes!
+
 ## Features
 - ECS using zig-ecs
 - Separated state and behavior

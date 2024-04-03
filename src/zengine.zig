@@ -1,149 +1,175 @@
 // This is the root module where public declarations are exposed.
-const registry = @import("registry.zig");
 const ecs = @import("ecs");
 const std = @import("std");
 
-pub const ZEngineComptimeOptions = struct {
-    /// A global system has once instance for the lifetime of the application
-    globalSystems: []const type,
-    /// Local systems have one instance per entity registry
-    localSystems: []const type,
-};
-
-pub const RegistrySet = struct {
-    globalRegistry: registry.SystemRegistry,
-    globalEcsRegistry: ecs.Registry,
-    /// Sparse list
-    localRegistries: std.ArrayList(?registry.SystemRegistry),
-    /// Sparse list
-    localEcsRegistry: std.ArrayList(?ecs.Registry),
-};
-
 pub const LocalHandle = usize;
 
-/// ZEngine requires a bunch of compile-time information from the user. This function should only be called once for each application.
-pub fn ZEngine(comptime options: ZEngineComptimeOptions) type {
-    inline for (options.globalSystems) |System| {
-        if (!System.comptimeVerification(options)) @compileError(@typeName(System) ++ " did not pass compile-time verification");
-        // TODO: Make sure it has all of the required functions.
-        // TODO: make sure the signature matches too
-
+pub const ZEngine = struct {
+    pub fn init(allocator: std.mem.Allocator) ZEngine {
+        return .{
+            .allocator = allocator,
+            ._globalRegistry = SystemRegistry.init(allocator),
+            ._globalEcsRegistry = ecs.Registry.init(allocator),
+            ._localRegistries = std.ArrayList(?SystemRegistry).init(allocator),
+            ._localEcsRegistries = std.ArrayList(?ecs.Registry).init(allocator),
+        };
     }
-    inline for (options.localSystems) |System| {
-        if (!System.comptimeVerification(options)) @compileError(@typeName(System) ++ " did not pass compile-time verification");
-        // TODO: Make sure it has all of the required functions.
-        // TODO: make sure the signature matches too
+    /// This destroys the engine and everything it holds.
+    /// No order is guaranteed for the destruction of registries and systems.
+    /// If something is order dependent, destroy those yourself separately before calling this.
+    pub fn deinit(this: *ZEngine) void {
+        this._globalRegistry.deinit();
+        this._globalEcsRegistry.deinit();
+        for(this._localRegistries.items) |*registryOrNone| {
+            // You know, getting a pointer from the pointer of a nullable feels a bit jank to me.
+            // Like, how does the compiler know to return the pointer of the original object
+            // and not a pointer to a new copy of it allocated on the stack?
+            // It's dereferenced, which in most cases seems to make a new copy on the stack, and then it is re-referenced.
+            if(registryOrNone.* == null) continue;
+            const registry = &registryOrNone.*.?;
+            registry.deinit();
+        }
+        this._localRegistries.deinit();
+        for(this._localEcsRegistries.items) |*registryOrNone| {
+            if(registryOrNone.* == null) continue;
+            const registry = &registryOrNone.*.?;
+            registry.deinit();
+        }
+        this._localEcsRegistries.deinit();
     }
-    return struct {
-        pub const Options = options;
-        pub const SystemRegistry = registry.SystemRegistry;
-        /// Creates an instance of ZEngine. Multiple instances are allowed but not recomended, instead use multiple local System/Ecs registres.
-        pub fn init(allocator: std.mem.Allocator, settings: anytype) !*@This() {
-            // You wouldn't believe how long it took me to find a bug relating to accidentally keeping the address of this stack variable.
-            // What's funny is I didn't notice until weeks after I created the bug, which makes me wonder how nothing bad happened before then.
-            const thisIsOnTheStackDontKeepAPointerRelatingToThis = @This(){ .registries = .{
-                .globalRegistry = SystemRegistry.init(allocator),
-                .globalEcsRegistry = ecs.Registry.init(allocator),
-                .localRegistries = std.ArrayList(?SystemRegistry).init(allocator),
-                .localEcsRegistry = std.ArrayList(?ecs.Registry).init(allocator),
-            }, .allocator = allocator };
-            const this = try allocator.create(@This());
-            this.* = thisIsOnTheStackDontKeepAPointerRelatingToThis;
-            const staticAllocator = this.registries.globalRegistry.staticAllocator.allocator();
-            // Allocate all of the systems
-            inline for (options.globalSystems) |System| {
-                const system = try staticAllocator.create(System);
-                system.* = System.init(staticAllocator, allocator);
-                try this.registries.globalRegistry.addRegister(System, system);
-            }
-            // Properly initialize all of the systems
-            inline for (options.globalSystems) |System| {
-                const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
-                try system.systemInitGlobal(&this.registries, settings);
-            }
-            return this;
-        }
 
-        pub fn initLocal(this: *@This(), allocator: std.mem.Allocator, settings: anytype) !LocalHandle {
-            const handle = try this.reserveLocal();
-            this.registries.localRegistries.items[handle] = SystemRegistry.init(allocator);
-            var localRegistry = &this.registries.localRegistries.items[handle].?;
-            var staticAllocator = localRegistry.staticAllocator.allocator();
-            // allocate the systems
-            inline for (options.localSystems) |System| {
-                const system = try staticAllocator.create(System);
-                system.* = System.init(staticAllocator, allocator);
-                try localRegistry.addRegister(System, system);
-            }
-            const localEcs = ecs.Registry.init(allocator);
-            this.registries.localEcsRegistry.items[handle] = localEcs;
-            // initialize the systems
-            inline for (options.localSystems) |System| {
-                const system = localRegistry.getRegister(System) orelse unreachable;
-                try system.systemInitLocal(&this.registries, handle, settings);
-            }
-            return handle;
-        }
+    /// Adds a system to the global registry. The user is in charge of managing its memory.
+    /// A deinit function is requred at minimum, for when the engine is destroyed.
+    pub fn registerGlobalSystem(this: *ZEngine, comptime T: type, system: *T) !void {
+        try this._globalRegistry.addRegister(T, system);
+    }
 
-        pub fn deinitLocal(this: *@This(), local: LocalHandle) void {
-            // deinit the local registry
-            const localRegistry = &this.registries.localRegistries.items[local].?;
-            // deinit systems in reverse order
-            inline for (0..options.localSystems.len) |index| {
-                const System = options.localSystems[options.localSystems.len - index - 1];
-                const system = localRegistry.getRegister(System).?;
-                system.systemDeinitLocal(&this.registries, local);
-            }
-            inline for (0..options.localSystems.len) |index| {
-                const System = options.localSystems[options.localSystems.len - index - 1];
-                const system = localRegistry.getRegister(System).?;
-                system.deinit();
-            }
-            localRegistry.deinit();
-            // Don't forget the entities too
-            const localEcs = &this.registries.localEcsRegistry.items[local].?;
-            localEcs.deinit();
-            // dereference
-            this.registries.localRegistries.items[local] = null;
-            this.registries.localEcsRegistry.items[local] = null;
-        }
+    /// Removes a register from the global registry and calls its deinit function.
+    pub fn deinitGlobalSystem(this: *ZEngine, comptime T: type) void {
+        this._globalRegistry.removeRegister(T);
+    }
 
-        /// Deinit ZEngine, along with all of its associated resources.
-        pub fn deinit(this: *@This()) void {
-            // deinit local systems - order shouldn't matter here
-            for (this.registries.localRegistries.items, 0..) |localRegistryOrNone, index| {
-                if (localRegistryOrNone == null) continue;
-                this.deinitLocal(index);
-            }
-            // deinit global systems in reverse order
-            inline for (0..options.globalSystems.len) |index| {
-                const System = options.globalSystems[options.globalSystems.len - index - 1];
-                const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
-                system.systemDeinitGlobal(&this.registries);
-            }
-            // destroy global systems in reverse order
-            inline for (0..options.globalSystems.len) |index| {
-                const System = options.globalSystems[options.globalSystems.len - index - 1];
-                const system = this.registries.globalRegistry.getRegister(System) orelse unreachable;
-                system.deinit();
-            }
-            this.registries.globalEcsRegistry.deinit();
-            this.registries.globalRegistry.deinit();
-            this.registries.localEcsRegistry.deinit();
-            this.registries.localRegistries.deinit();
-            this.allocator.destroy(this);
-        }
+    pub fn getGlobalSystem(this: *const ZEngine, comptime T: type) ?*T {
+        return this._globalRegistry.getRegister(T);
+    }
 
-        fn reserveLocal(this: *@This()) !LocalHandle {
-            for (this.registries.localRegistries.items, 0..) |item, index| {
-                if (item == null) return index;
-            }
-            const index = this.registries.localRegistries.items.len;
-            _ = try this.registries.localRegistries.addOne();
-            _ = try this.registries.localEcsRegistry.addOne();
-            return index;
+    pub fn initLocalRegistry(this: *ZEngine) !LocalHandle {
+        // TODO: way to use a custom allocator for each local registry
+        // TODO: search for empty slot?
+        try this._localRegistries.append(SystemRegistry.init(this.allocator));
+        try this._localEcsRegistries.append(ecs.Registry.init(this.allocator));
+        return this._localRegistries.items.len-1;
+    }
+
+    pub fn deinitLocalRegistry(this: *ZEngine, handle: LocalHandle) void {
+        this._localRegistries.items[handle].?.deinit();
+        this._localEcsRegistries.items[handle].?.deinit();
+        this._localRegistries.items[handle] = null;
+        this._localEcsRegistries.items[handle] = null;
+    }
+
+    pub fn registerLocalSystem(this: *ZEngine, handle: LocalHandle, comptime T: type, obj: *T) !void {
+        try this._localRegistries.items[handle].?.addRegister(T, obj);
+    }
+
+    pub fn deinitLocalSystem(this: *ZEngine, handle: LocalHandle, comptime T: type) void {
+        this._localRegistries.items[handle].?.removeRegister(T);
+    }
+
+    pub fn getLocalSystem(this: *const ZEngine, handle: LocalHandle, comptime T: type) ?*T {
+        return this._localRegistries.items[handle].?.getRegister(T);
+    }
+
+    pub fn getNumLocalSystems(this: *const ZEngine) usize {
+        // TODO: cache this value
+        var num: usize = 0;
+        for(this._localRegistries.items) |registry| {
+            if(registry != null) num+=1;
         }
-        registries: RegistrySet,
-        allocator: std.mem.Allocator,
-    };
-}
+        return num;
+    }
+
+    pub fn getCapacityLocalSystems(this: *const ZEngine) usize {
+        return this._localRegistries.items.len;
+    }
+
+    allocator: std.mem.Allocator,
+    _globalRegistry: SystemRegistry,
+    _globalEcsRegistry: ecs.Registry,
+    /// Sparse list
+    _localRegistries: std.ArrayList(?SystemRegistry),
+    /// Sparse list
+    _localEcsRegistries: std.ArrayList(?ecs.Registry),
+};
+
+const Register = struct {
+    object: *anyopaque,
+    deinitFn: *const fn (object: *anyopaque) void,
+};
+
+const SystemRegistry = struct {
+    pub fn init(allocator: std.mem.Allocator) SystemRegistry {
+        return .{
+            .allocator = allocator,
+            ._storage = Storage.init(allocator),
+        };
+    }
+
+    /// Destroys this along with any remaining registers
+    pub fn deinit(this: *SystemRegistry) void {
+        var iterator = this._storage.iterator();
+        while(iterator.next()) |register| {
+            register.value_ptr.deinitFn(register.value_ptr.object);
+        }
+        this._storage.deinit();
+    }
+
+    pub fn addRegister(this: *SystemRegistry, comptime T: type, obj: *T) !void {
+        const id = hashType(T);
+        const result = try this._storage.getOrPut(id);
+        if(result.found_existing) {
+            std.debug.panic("Register type {s} has existing register!", .{@typeName(T)});
+        }
+        result.value_ptr.* = .{
+            .object = obj,
+            // TODO: this reference to a field that may or may not exist is dificult to debug. Add an actual compile error message if this function is not correct.
+            // TODO: instead of just a pointer cast, verify the function signiture THEN do the cast.
+            .deinitFn = @ptrCast(&T.deinit),
+        };
+    }
+
+    pub fn getRegister(this: *const SystemRegistry, comptime T: type) ?*T {
+        const id = hashType(T);
+        const register = this._storage.get(id);
+        if(register == null) return null;
+        // Assume since the ID is the same, the type is the same as well.
+        return @alignCast(@ptrCast(register.?.object));
+    }
+
+    /// Removes a register from the registry and calls its deinit function.
+    pub fn removeRegister(this: *SystemRegistry, comptime T: type) void {
+        const id = hashType(T);
+        const objOrNone = this._storage.fetchSwapRemove(id);
+        if(objOrNone) |obj|{
+            obj.value.deinitFn(obj.value.object);
+        }
+    }
+
+    fn hashType(comptime T: type) u64 {
+        return std.hash.Fnv1a_64.hash(@typeName(T));
+    }
+
+    const Storage = std.ArrayHashMap(u64, Register, struct {
+        pub inline fn hash(this: @This(), key: u64) u32 {
+            _ = this;
+            return @intCast(key & std.math.maxInt(u32));
+        }
+        pub inline fn eql(this: @This(), keyA: u64, keyB: u64, idx: usize) bool {
+            _ = idx;
+            _ = this;
+            return keyA == keyB;
+        }
+    }, false);
+    allocator: std.mem.Allocator,
+    _storage: Storage,
+};
