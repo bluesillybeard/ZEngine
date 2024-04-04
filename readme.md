@@ -1,9 +1,11 @@
 # ZEngine
 
-A basic game engine written in Zig.
+A basic game engine written in Zig. It's more of a basic foundation than anything.
 
 ## Important notice
-ZEngine is early in development. It may *seem* like an insanely tiny library, therefore it's impossible to get wrong. However, since this is an isanely critical part of a game, despite its simplicity there still so much it can improve. As such, expect breaking changes!
+ZEngine is early in development. It may *seem* like an insanely tiny library, therefore it's impossible to get wrong. However, since this is a critical part of a game, despite its simplicity there is still so much it can improve. As such, expect breaking changes!
+
+Also, ZEngine is specifically created for my own projects. It's MIT licensed for a reason - I have little care about what other people do with it, since I created it for my own use.
 
 ## Features
 - ECS using zig-ecs
