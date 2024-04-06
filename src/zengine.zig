@@ -2,6 +2,10 @@
 const ecs = @import("ecs");
 const std = @import("std");
 
+pub const ZEngineError = error {
+    noEcsFound,
+} || RegistryError;
+
 pub const LocalHandle = usize;
 
 pub const ZEngine = struct {
@@ -49,8 +53,12 @@ pub const ZEngine = struct {
         this._globalRegistry.removeRegister(T);
     }
 
-    pub fn getGlobalSystem(this: *const ZEngine, comptime T: type) ?*T {
+    pub fn getGlobalSystem(this: *const ZEngine, comptime T: type) ZEngineError!*T {
         return this._globalRegistry.getRegister(T);
+    }
+
+    pub fn getGlobalEcs(this: *const ZEngine) *ecs.Registry {
+        return this._globalEcsRegistry;
     }
 
     pub fn initLocalRegistry(this: *ZEngine) !LocalHandle {
@@ -66,6 +74,13 @@ pub const ZEngine = struct {
         this._localEcsRegistries.items[handle].?.deinit();
         this._localRegistries.items[handle] = null;
         this._localEcsRegistries.items[handle] = null;
+    }
+
+    pub fn getLocalEcs(this: *const ZEngine, handle: LocalHandle) !*ecs.Registry {
+        const registry = &this._localEcsRegistries.items[handle];
+        if(registry.* == null) return ZEngineError.noEcsFound;
+        // This makes me nervous. How does the compiler know to return the address of the actual registry rather than a copy on this function's stack?
+        return &(registry.*.?);
     }
 
     pub fn registerLocalSystem(this: *ZEngine, handle: LocalHandle, comptime T: type, obj: *T) !void {
@@ -100,6 +115,10 @@ pub const ZEngine = struct {
     _localRegistries: std.ArrayList(?SystemRegistry),
     /// Sparse list
     _localEcsRegistries: std.ArrayList(?ecs.Registry),
+};
+
+pub const RegistryError = error {
+    noRegisterFound,
 };
 
 const Register = struct {
@@ -138,10 +157,10 @@ const SystemRegistry = struct {
         };
     }
 
-    pub fn getRegister(this: *const SystemRegistry, comptime T: type) ?*T {
+    pub fn getRegister(this: *const SystemRegistry, comptime T: type) RegistryError!*T {
         const id = hashType(T);
         const register = this._storage.get(id);
-        if(register == null) return null;
+        if(register == null) return RegistryError.noRegisterFound;
         // Assume since the ID is the same, the type is the same as well.
         return @alignCast(@ptrCast(register.?.object));
     }
