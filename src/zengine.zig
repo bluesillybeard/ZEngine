@@ -57,8 +57,8 @@ pub const ZEngine = struct {
         return this._globalRegistry.getRegister(T);
     }
 
-    pub fn getGlobalEcs(this: *const ZEngine) *ecs.Registry {
-        return this._globalEcsRegistry;
+    pub fn getGlobalEcs(this: *ZEngine) *ecs.Registry {
+        return &this._globalEcsRegistry;
     }
 
     pub fn initLocalRegistry(this: *ZEngine) !LocalHandle {
