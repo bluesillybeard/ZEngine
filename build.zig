@@ -6,14 +6,14 @@ pub fn build(b: *std.Build) void {
 
     //ZEngine depends on zig-ecs
     const ecs = b.createModule(.{
-        .root_source_file = .{.path = "zig-ecs/src/ecs.zig"},
+        .root_source_file = .{ .path = "zig-ecs/src/ecs.zig" },
         .target = target,
         .optimize = optimize,
     });
 
     // ZEngine is intended to be included as source code as a module like this
     const zengine = b.createModule(.{
-        .root_source_file = .{.path = "src/zengine.zig"},
+        .root_source_file = .{ .path = "src/zengine.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) void {
 
     // This is for running tests
     const tests = b.addTest(.{
-        .root_source_file = .{.path = "tests/tests.zig"},
+        .root_source_file = .{ .path = "tests/tests.zig" },
         .name = "tests",
         .optimize = optimize,
         .target = target,

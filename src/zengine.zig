@@ -2,7 +2,7 @@
 const ecs = @import("ecs");
 const std = @import("std");
 
-pub const ZEngineError = error {
+pub const ZEngineError = error{
     noEcsFound,
 } || RegistryError;
 
@@ -24,18 +24,18 @@ pub const ZEngine = struct {
     pub fn deinit(this: *ZEngine) void {
         this._globalRegistry.deinit();
         this._globalEcsRegistry.deinit();
-        for(this._localRegistries.items) |*registryOrNone| {
+        for (this._localRegistries.items) |*registryOrNone| {
             // You know, getting a pointer from the pointer of a nullable feels a bit jank to me.
             // Like, how does the compiler know to return the pointer of the original object
             // and not a pointer to a new copy of it allocated on the stack?
             // It's dereferenced, which in most cases seems to make a new copy on the stack, and then it is re-referenced.
-            if(registryOrNone.* == null) continue;
+            if (registryOrNone.* == null) continue;
             const registry = &registryOrNone.*.?;
             registry.deinit();
         }
         this._localRegistries.deinit();
-        for(this._localEcsRegistries.items) |*registryOrNone| {
-            if(registryOrNone.* == null) continue;
+        for (this._localEcsRegistries.items) |*registryOrNone| {
+            if (registryOrNone.* == null) continue;
             const registry = &registryOrNone.*.?;
             registry.deinit();
         }
@@ -66,7 +66,7 @@ pub const ZEngine = struct {
         // TODO: search for empty slot?
         try this._localRegistries.append(SystemRegistry.init(this.allocator));
         try this._localEcsRegistries.append(ecs.Registry.init(this.allocator));
-        return this._localRegistries.items.len-1;
+        return this._localRegistries.items.len - 1;
     }
 
     pub fn deinitLocalRegistry(this: *ZEngine, handle: LocalHandle) void {
@@ -78,7 +78,7 @@ pub const ZEngine = struct {
 
     pub fn getLocalEcs(this: *const ZEngine, handle: LocalHandle) !*ecs.Registry {
         const registry = &this._localEcsRegistries.items[handle];
-        if(registry.* == null) return ZEngineError.noEcsFound;
+        if (registry.* == null) return ZEngineError.noEcsFound;
         // This makes me nervous. How does the compiler know to return the address of the actual registry rather than a copy on this function's stack?
         return &(registry.*.?);
     }
@@ -98,8 +98,8 @@ pub const ZEngine = struct {
     pub fn getNumLocalSystems(this: *const ZEngine) usize {
         // TODO: cache this value
         var num: usize = 0;
-        for(this._localRegistries.items) |registry| {
-            if(registry != null) num+=1;
+        for (this._localRegistries.items) |registry| {
+            if (registry != null) num += 1;
         }
         return num;
     }
@@ -117,7 +117,7 @@ pub const ZEngine = struct {
     _localEcsRegistries: std.ArrayList(?ecs.Registry),
 };
 
-pub const RegistryError = error {
+pub const RegistryError = error{
     noRegisterFound,
 };
 
@@ -137,7 +137,7 @@ const SystemRegistry = struct {
     /// Destroys this along with any remaining registers
     pub fn deinit(this: *SystemRegistry) void {
         var iterator = this._storage.iterator();
-        while(iterator.next()) |register| {
+        while (iterator.next()) |register| {
             register.value_ptr.deinitFn(register.value_ptr.object);
         }
         this._storage.deinit();
@@ -146,7 +146,7 @@ const SystemRegistry = struct {
     pub fn addRegister(this: *SystemRegistry, comptime T: type, obj: *T) !void {
         const id = hashType(T);
         const result = try this._storage.getOrPut(id);
-        if(result.found_existing) {
+        if (result.found_existing) {
             std.debug.panic("Register type {s} has existing register!", .{@typeName(T)});
         }
         result.value_ptr.* = .{
@@ -160,7 +160,7 @@ const SystemRegistry = struct {
     pub fn getRegister(this: *const SystemRegistry, comptime T: type) RegistryError!*T {
         const id = hashType(T);
         const register = this._storage.get(id);
-        if(register == null) return RegistryError.noRegisterFound;
+        if (register == null) return RegistryError.noRegisterFound;
         // Assume since the ID is the same, the type is the same as well.
         return @alignCast(@ptrCast(register.?.object));
     }
@@ -169,7 +169,7 @@ const SystemRegistry = struct {
     pub fn removeRegister(this: *SystemRegistry, comptime T: type) void {
         const id = hashType(T);
         const objOrNone = this._storage.fetchSwapRemove(id);
-        if(objOrNone) |obj|{
+        if (objOrNone) |obj| {
             obj.value.deinitFn(obj.value.object);
         }
     }
