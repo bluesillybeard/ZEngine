@@ -91,7 +91,7 @@ pub const ZEngine = struct {
         this._localRegistries.items[handle].?.removeRegister(T);
     }
 
-    pub fn getLocalSystem(this: *const ZEngine, handle: LocalHandle, comptime T: type) ?*T {
+    pub fn getLocalSystem(this: *const ZEngine, handle: LocalHandle, comptime T: type) RegistryError!*T {
         return this._localRegistries.items[handle].?.getRegister(T);
     }
 
